@@ -10,6 +10,7 @@ import os
 import uuid
 import threading
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 from .logging import log
 
@@ -25,6 +26,16 @@ class LifecycleManager:
         log(f'Worker ID: {self.worker_id}')
 
         self.job_id = None
+
+        # ------------------------------ Request Session ----------------------------- #
+        self.rp_session = requests.Session()
+
+        self.rp_session.headers.update({"Authorization": f"{os.environ.get('RUNPOD_AI_API_KEY')}"})
+
+        retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
+
+        # Applies to all https requests made with this session
+        self.rp_session.mount('https://', HTTPAdapter(max_retries=retries))
 
     def heartbeat_ping(self):
         '''
@@ -43,10 +54,8 @@ class LifecycleManager:
             if webhook_ping is not None:
                 webhook_ping = webhook_ping.replace('$RUNPOD_POD_ID', self.worker_id)
 
-                headers = {"Authorization": f"{os.environ.get('RUNPOD_AI_API_KEY')}"}
-                requests.get(
+                self.rp_session.get(
                     webhook_ping,
-                    headers=headers,
                     params=ping_params,
                     timeout=int(ping_interval/1000)
                 )

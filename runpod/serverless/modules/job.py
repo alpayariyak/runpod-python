@@ -4,23 +4,12 @@ import os
 import time
 import json
 import requests
-from requests.adapters import HTTPAdapter, Retry
+
 
 from .logging import log
 
-rp_session = requests.Session()
-rp_session.headers.update({"Authorization": f"{os.environ.get('RUNPOD_AI_API_KEY')}"})
 
-
-retries = Retry(total=5,
-                backoff_factor=0.1,
-                status_forcelist=[500, 502, 503, 504])
-
-# Applies to all https requests made with this session
-rp_session.mount('https://', HTTPAdapter(max_retries=retries))
-
-
-def get(worker_id):
+def get(worker_id, rp_session):
     '''
     Get next job from job endpoint, returns job json.
     The job format is:
@@ -101,7 +90,7 @@ def run(job, run_handler):
         return run_return  # pylint: disable=lost-exception
 
 
-def post(worker_id, job_id, job_output):
+def post(worker_id, job_id, job_output, rp_session):
     '''
     Complete the job.
     '''
@@ -122,7 +111,6 @@ def post(worker_id, job_id, job_output):
     headers = {
         "charset": "utf-8",
         "Content-Type": "application/x-www-form-urlencoded",
-        # "Authorization": f"{os.environ.get('RUNPOD_AI_API_KEY')}"
     }
 
     try:
@@ -148,7 +136,7 @@ def post(worker_id, job_id, job_output):
     return
 
 
-def error(worker_id, job_id, error_message):
+def error(worker_id, job_id, error_message, rp_session):
     '''
     Report an error to the job endpoint, marking the job as failed.
     '''
@@ -171,7 +159,6 @@ def error(worker_id, job_id, error_message):
     headers = {
         "charset": "utf-8",
         "Content-Type": "application/x-www-form-urlencoded",
-        # "Authorization": f"{os.environ.get('RUNPOD_AI_API_KEY')}"
     }
 
     try:

@@ -18,7 +18,7 @@ def start_worker(config):
     log("Worker lifecycle manager started.", "INFO")
 
     while True:
-        next_job = job.get(worker_life.worker_id)
+        next_job = job.get(worker_life.worker_id, worker_life.rp_session)
 
         try:
             if next_job is None:
@@ -29,19 +29,22 @@ def start_worker(config):
 
             if 'input' not in next_job:
                 log("No input parameter provided. Erroring out request.", "ERROR")
-                job.error(worker_life.worker_id, next_job['id'], "No input provided.")
+                job.error(worker_life.worker_id, next_job['id'],
+                          "No input provided.", worker_life.rp_session)
                 continue
 
             job_results = job.run(next_job, config['handler'])
 
             if 'error' in job_results:
-                job.error(worker_life.worker_id, next_job['id'], job_results['error'])
+                job.error(worker_life.worker_id, next_job['id'],
+                          job_results['error'], worker_life.rp_session)
                 continue
 
-            job.post(worker_life.worker_id, next_job['id'], job_results['output'])
+            job.post(worker_life.worker_id, next_job['id'],
+                     job_results['output'], worker_life.rp_session)
 
         except (KeyError, ValueError, RuntimeError) as err:
-            job.error(worker_life.worker_id, next_job['id'], str(err))
+            job.error(worker_life.worker_id, next_job['id'], str(err), worker_life.rp_session)
 
         finally:
             worker_life.job_id = None
