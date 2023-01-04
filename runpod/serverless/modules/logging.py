@@ -11,9 +11,24 @@ load_dotenv(env_path)  # Load environment variables
 def log(message, level='INFO'):
     '''
     Log message to stdout
+    If set_level is DEBUG or set_level is lower than level, log the message.
     '''
-    if os.environ.get('RUNPOD_DEBUG', 'False') == 'true':
-        print(f'{level} | {message}')
+    set_level = os.environ.get('RUNPOD_DEBUG_LEVEL', 'DEBUG').upper()
+
+    if os.environ.get('RUNPOD_DEBUG', 'False') != 'true':
+        return
+
+    if set_level == 'ERROR' and level != 'ERROR':
+        return
+
+    if set_level == 'WARN' and level not in ['ERROR', 'WARN']:
+        return
+
+    if set_level == 'INFO' and level not in ['ERROR', 'WARN', 'INFO']:
+        return
+
+    print(f'{level} | {message}')
+    return
 
 
 def log_secret(secret_name, secret, level='INFO'):
@@ -35,7 +50,3 @@ log('Logging module loaded')
 log_secret('RUNPOD_AI_API_KEY', os.environ.get('RUNPOD_AI_API_KEY', None))
 log_secret('RUNPOD_WEBHOOK_GET_JOB', os.environ.get('RUNPOD_WEBHOOK_GET_JOB', None))
 log_secret('RUNPOD_WEBHOOK_POST_OUTPUT', os.environ.get('RUNPOD_WEBHOOK_POST_OUTPUT', None))
-
-# log_secret('BUCKET_ENDPOINT_URL', os.environ.get('BUCKET_ENDPOINT_URL', None))
-# log_secret('BUCKET_ACCESS_KEY_ID', os.environ.get('BUCKET_ACCESS_KEY_ID', None))
-# log_secret('BUCKET_SECRET_ACCESS_KEY', os.environ.get('BUCKET_SECRET_ACCESS_KEY', None))
