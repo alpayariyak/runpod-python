@@ -35,8 +35,7 @@ class TestWorker(IsolatedAsyncioTestCase):
         '''
         with patch("runpod.serverless.worker.os") as mock_os:
             mock_os.environ.get.return_value = "test"
-            assert runpod.serverless.worker._get_auth_header(
-            ) == {'Authorization': 'test'}  # pylint: disable=protected-access
+            assert runpod.serverless.worker._get_auth_header() == {'Authorization': 'test'}  # pylint: disable=protected-access
 
     def test_is_local(self):
         '''
@@ -44,14 +43,11 @@ class TestWorker(IsolatedAsyncioTestCase):
         '''
         with patch("runpod.serverless.worker.os") as mock_os:
             mock_os.environ.get.return_value = None
-            assert runpod.serverless.worker._is_local(
-                {"rp_args": {}}) is True  # pylint: disable=protected-access
-            assert runpod.serverless.worker._is_local(
-                {"rp_args": {"test_input": "something"}}) is True  # pylint: disable=protected-access, line-too-long
+            assert runpod.serverless.worker._is_local({"rp_args": {}}) is True  # pylint: disable=protected-access
+            assert runpod.serverless.worker._is_local({"rp_args": {"test_input": "something"}}) is True  # pylint: disable=protected-access, line-too-long
 
             mock_os.environ.get.return_value = "something"
-            assert runpod.serverless.worker._is_local(
-                self.mock_config) is False  # pylint: disable=protected-access
+            assert runpod.serverless.worker._is_local(self.mock_config) is False  # pylint: disable=protected-access
 
     def test_start(self):
         '''
@@ -70,12 +66,10 @@ class TestWorker(IsolatedAsyncioTestCase):
         '''
         with patch("runpod.serverless.worker.os") as mock_os:
             mock_os.environ.get.return_value = None
-            assert runpod.serverless.worker._is_local(
-                self.mock_config) is True  # pylint: disable=protected-access
+            assert runpod.serverless.worker._is_local(self.mock_config) is True  # pylint: disable=protected-access
 
             mock_os.environ.get.return_value = "something"
-            assert runpod.serverless.worker._is_local(
-                self.mock_config) is False  # pylint: disable=protected-access
+            assert runpod.serverless.worker._is_local(self.mock_config) is False  # pylint: disable=protected-access
 
     def test_local_api(self):
         '''
@@ -148,7 +142,7 @@ def generator_handler_exception(job):
     '''
     print(job)
     yield "test1"
-    raise Exception()  # pylint: disable=broad-exception-raised
+    raise Exception() # pylint: disable=broad-exception-raised
 
 
 class TestRunWorker(IsolatedAsyncioTestCase):
