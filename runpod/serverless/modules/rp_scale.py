@@ -58,15 +58,20 @@ class JobScaler():
     AVAILABILITY_RATIO_THRESHOLD = 0.90
     INITIAL_CONCURRENT_REQUESTS = 1
     MAX_CONCURRENT_REQUESTS = 100
-    MIN_CONCURRENT_REQUESTS = 1
+    MIN_CONCURRENT_REQUESTS = 0
     SLEEP_INTERVAL_SEC = 1
 
     def __init__(self, concurrency_controller: typing.Any):
         self.background_get_job_tasks = set()
-        self.num_concurrent_get_job_requests = JobScaler.INITIAL_CONCURRENT_REQUESTS
         self.job_history = []
         self.concurrency_controller = concurrency_controller
         self._is_alive = True
+
+        if concurrency_controller:
+            # Initialize the number of concurrent requests with the maximum concurrency.
+            self.num_concurrent_get_job_requests = self.concurrency_controller()
+        else:
+            self.num_concurrent_get_job_requests = JobScaler.INITIAL_CONCURRENT_REQUESTS
 
     def is_alive(self):
         """
@@ -149,8 +154,6 @@ class JobScaler():
                 f" Parallel processing = {use_parallel_processing}"
             )
 
-
-
     def upscale_rate(self) -> None:
         """
         Upscale the job retrieval rate by adjusting the number of concurrent requests.
@@ -163,6 +166,10 @@ class JobScaler():
             JobScaler.CONCURRENCY_SCALE_FACTOR,
             JobScaler.MAX_CONCURRENT_REQUESTS
         )
+
+        # We can now reduce concurrent requests to 0. Therefore, when we're upscaling,
+        # let's ensure to bring it up to 1.
+        self.num_concurrent_get_job_requests = max(self.num_concurrent_get_job_requests, 1)
 
     def downscale_rate(self) -> None:
         """
@@ -180,23 +187,16 @@ class JobScaler():
         """
         Scale up or down the rate at which we are handling jobs from SLS.
         """
-        # Compute the availability ratio of the job queue.
-        availability_ratio = sum(self.job_history) / len(self.job_history)
+        # Compute the concurrency values
+        current_concurrency = len(job_list.jobs)
+        maximum_concurrency = self.concurrency_controller()
 
         # If our worker is fully utilized or the SLS queue is throttling, reduce the job query rate.
-        if self.concurrency_controller() is True:
+        if current_concurrency >= maximum_concurrency:
             log.debug("Reducing job query rate due to full worker utilization.")
 
             self.downscale_rate()
-        elif availability_ratio < 1 / JobScaler.CONCURRENCY_SCALE_FACTOR:
-            log.debug(
-                "Reducing job query rate due to low job queue availability.")
-
-            self.downscale_rate()
-        elif availability_ratio >= JobScaler.AVAILABILITY_RATIO_THRESHOLD:
-            log.debug(
-                "Increasing job query rate due to increased job queue availability.")
-
+        else:
             self.upscale_rate()
 
         # Clear the job history

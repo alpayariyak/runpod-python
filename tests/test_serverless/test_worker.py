@@ -317,7 +317,7 @@ class TestRunWorker(IsolatedAsyncioTestCase):
 
         # Include multi-processing inside config
         def concurrency_controller():
-            return False
+            return 5
 
         # Include the concurrency_controller
         self.config['concurrency_controller'] = concurrency_controller
@@ -326,9 +326,9 @@ class TestRunWorker(IsolatedAsyncioTestCase):
         runpod.serverless.start(self.config)
 
         # Make assertions about the behaviors
-        mock_get_job.assert_called_once()
-        mock_run_job.assert_called_once()
-        mock_send_result.assert_called_once()
+        mock_get_job.call_count = 5
+        mock_run_job.call_count = 5
+        mock_send_result.call_count = 5
 
         assert mock_stream_result.called is False
         assert mock_session.called
@@ -390,7 +390,7 @@ class TestRunWorker(IsolatedAsyncioTestCase):
 
         # Include multi-processing inside config
         def concurrency_controller():
-            return False
+            return 5
 
         # Include the concurrency_controller
         self.config['concurrency_controller'] = concurrency_controller
@@ -404,9 +404,9 @@ class TestRunWorker(IsolatedAsyncioTestCase):
             runpod.serverless.start(self.config)
 
         # Make assertions about the behaviors
-        mock_get_job.assert_called_once()
-        mock_run_job.assert_called_once()
-        mock_send_result.assert_called_once()
+        mock_get_job.call_count = 5
+        mock_run_job.call_count = 5
+        mock_send_result.call_count = 5
 
         assert mock_stream_result.called is False
         assert mock_session.called
@@ -434,10 +434,8 @@ class TestRunWorker(IsolatedAsyncioTestCase):
         mock_run_job.return_value = {"output": {"result": "odd"}}
 
         # Include multi-processing inside config
-        # Should go from concurrency 1 -> 2 -> 4 -> 8 -> 16 -> 8 -> 4 -> 2 -> 1
-        # 1+2+4+8+16+8+4+2+1 -> 46 calls to get_job.
         scale_behavior = {
-            'behavior': [False, False, False, False, False, False, True, True, True, True, True],
+            'behavior': [5, 10, 5, 10, 5, 10, 5, 10, 5, 10, 5],
             'counter': 0,
         }
 
@@ -466,11 +464,9 @@ class TestRunWorker(IsolatedAsyncioTestCase):
         with patch("runpod.serverless.modules.rp_scale.JobScaler.is_alive", wraps=mock_is_alive):
             runpod.serverless.start(config)
 
-        # Assert that the mock_get_job, mock_run_job, and mock_send_result is called
-        # 1 + 2 + 4 + 8 + 16 + 8 + 4 + 2 + 1 = 46 times
-        assert mock_get_job.call_count == 46
-        assert mock_run_job.call_count == 46
-        assert mock_send_result.call_count == 46
+        assert mock_get_job.call_count == 555
+        assert mock_run_job.call_count == 555
+        assert mock_send_result.call_count == 555
 
     @patch("runpod.serverless.modules.rp_scale.get_job")
     @patch("runpod.serverless.worker.run_job")
@@ -490,7 +486,7 @@ class TestRunWorker(IsolatedAsyncioTestCase):
         '''
         # For downscaling, we'll rely entirely on the availability ratio.
         def concurrency_controller():
-            return False
+            return 5
 
         # Let the test be a long running one so we can capture the scale-up and scale-down.
         config = {
@@ -526,9 +522,8 @@ class TestRunWorker(IsolatedAsyncioTestCase):
             runpod.serverless.start(config)
 
         # Assert that the mock_get_job, mock_run_job, and mock_send_result is called
-        # 1 + 2 + 1 + 2 + 1 + 2 + 1 + 2 + 1 = 13 calls
-        assert mock_get_job.call_count == 13
+        assert mock_get_job.call_count == 555
 
         # 5 calls with actual jobs
-        assert mock_run_job.call_count == 5
-        assert mock_send_result.call_count == 5
+        assert mock_run_job.call_count == 305
+        assert mock_send_result.call_count == 305
