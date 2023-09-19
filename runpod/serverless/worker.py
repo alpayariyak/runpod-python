@@ -119,7 +119,7 @@ async def run_worker(config: Dict[str, Any]) -> None:
 
     async with client_session as session:
         job_scaler = JobScaler(
-            concurrency_controller=config.get('concurrency_controller', None)
+            max_concurrency=config.get('max_concurrency', None)
         )
 
         while job_scaler.is_alive():

@@ -17,25 +17,18 @@ class JobScaler():
     """
     A class for automatically retrieving new jobs from the server and processing them concurrently.
 
-    Attributes:
-        server_url (str): The URL of the server to retrieve jobs from.
-        max_concurrent_jobs (int): The maximum number of jobs to process concurrently.
-        upscale_factor (float): The factor by which to upscale the job retrieval rate.
-        downscale_factor (float): The factor by which to downscale the job retrieval rate.
-
     Methods:
         get_jobs() -> List[Dict]:
-            Retrieves multiple jobs from the server in parallel using concurrent requests.
+            Retrieves multiple jobs from the server in parallel using concurrent get requests.
 
         upscale_rate() -> None:
-            Upscales the job retrieval rate by adjusting the number of concurrent requests.
+            Upscales the job retrieval rate by increasing the number of concurrent get requests.
 
         downscale_rate() -> None:
-            Downscales the job retrieval rate by adjusting the number of concurrent requests.
+            Downscales the job retrieval rate by reducing the number of concurrent get requests.
 
         rescale_request_rate() -> None:
-            Rescales the job retrieval rate based on factors such as job queue availability
-            and handler utilization.
+            Rescales the job retrieval rate based on the current level of utilization in the worker.
 
     Usage example:
         job_scaler = JobScaler(config)
@@ -54,18 +47,15 @@ class JobScaler():
     """
 
     # Scaling Constants
-    CONCURRENCY_SCALE_FACTOR = 2
-    AVAILABILITY_RATIO_THRESHOLD = 0.90
-    INITIAL_CONCURRENT_REQUESTS = 1
-    MAX_CONCURRENT_REQUESTS = 100
+    CONCURRENCY_ADDITIVE_FACTOR = 1
+    MAX_CONCURRENT_REQUESTS = 1000
     MIN_CONCURRENT_REQUESTS = 1
     SLEEP_INTERVAL_SEC = 1
 
-    def __init__(self, concurrency_controller: typing.Any):
+    def __init__(self, max_concurrency: typing.Any):
         self.background_get_job_tasks = set()
-        self.num_concurrent_get_job_requests = JobScaler.INITIAL_CONCURRENT_REQUESTS
-        self.job_history = []
-        self.concurrency_controller = concurrency_controller
+        self.num_concurrent_get_job_requests = JobScaler.MIN_CONCURRENT_REQUESTS
+        self.max_concurrency = max_concurrency
         self._is_alive = True
 
     def is_alive(self):
@@ -100,8 +90,7 @@ class JobScaler():
                 break
 
             # Use parallel processing whenever possible
-            use_parallel_processing = self.concurrency_controller and \
-                (job_list.get_job_list() is not None or self.num_concurrent_get_job_requests > 1)
+            use_parallel_processing = self.max_concurrency and job_list.get_job_list() is not None
 
             if use_parallel_processing:
                 # Prepare the 'get_job' tasks for parallel execution.
@@ -115,25 +104,23 @@ class JobScaler():
                 # Wait for all the 'get_job' tasks, which are running in parallel, to be completed.
                 for job_future in asyncio.as_completed(tasks):
                     job = await job_future
-                    self.job_history.append(1 if job else 0)
                     if job:
                         yield job
             else:
                 for _ in range(self.num_concurrent_get_job_requests):
                     job = await get_job(session, retry=False)
-                    self.job_history.append(1 if job else 0)
                     if job:
                         yield job
 
-            # During the single processing scenario, wait for the job to finish processing.
-            if self.concurrency_controller is None:
+            # During the single processing scenario, wait for the single job to finish processing.
+            if self.max_concurrency is None:
                 # Create a copy of the background job tasks list to keep references to the tasks.
                 job_tasks_copy = self.background_get_job_tasks.copy()
                 if job_tasks_copy:
                     # Wait for the job tasks to finish processing before continuing.
                     await asyncio.wait(job_tasks_copy)
+
                 # Exit the loop after processing a single job (since the handler is fully utilized).
-                await asyncio.sleep(JobScaler.SLEEP_INTERVAL_SEC)
                 break
 
             # We retrieve num_concurrent_get_job_requests jobs per second.
@@ -149,30 +136,28 @@ class JobScaler():
                 f" Parallel processing = {use_parallel_processing}"
             )
 
-
-
     def upscale_rate(self) -> None:
         """
-        Upscale the job retrieval rate by adjusting the number of concurrent requests.
+        Upscale the job retrieval rate by increasing the number of concurrent requests.
 
         This method increases the number of concurrent requests to the server,
         effectively retrieving more jobs per unit of time.
         """
         self.num_concurrent_get_job_requests = min(
-            self.num_concurrent_get_job_requests *
-            JobScaler.CONCURRENCY_SCALE_FACTOR,
+            self.num_concurrent_get_job_requests +
+            JobScaler.CONCURRENCY_ADDITIVE_FACTOR,
             JobScaler.MAX_CONCURRENT_REQUESTS
         )
 
     def downscale_rate(self) -> None:
         """
-        Downscale the job retrieval rate by adjusting the number of concurrent requests.
+        Downscale the job retrieval rate by reducing the number of concurrent requests.
 
         This method decreases the number of concurrent requests to the server,
         effectively retrieving fewer jobs per unit of time.
         """
         self.num_concurrent_get_job_requests = int(max(
-            self.num_concurrent_get_job_requests // JobScaler.CONCURRENCY_SCALE_FACTOR,
+            self.num_concurrent_get_job_requests - JobScaler.CONCURRENCY_ADDITIVE_FACTOR,
             JobScaler.MIN_CONCURRENT_REQUESTS
         ))
 
@@ -180,24 +165,16 @@ class JobScaler():
         """
         Scale up or down the rate at which we are handling jobs from SLS.
         """
-        # Compute the availability ratio of the job queue.
-        availability_ratio = sum(self.job_history) / len(self.job_history)
+        # Compute the current level of concurrency inside of the worker
+        current_concurrency = len(job_list.jobs)
 
-        # If our worker is fully utilized or the SLS queue is throttling, reduce the job query rate.
-        if self.concurrency_controller() is True:
+        # If our worker is fully utilized, reduce the job query rate.
+        if current_concurrency > self.max_concurrency():
             log.debug("Reducing job query rate due to full worker utilization.")
-
             self.downscale_rate()
-        elif availability_ratio < 1 / JobScaler.CONCURRENCY_SCALE_FACTOR:
-            log.debug(
-                "Reducing job query rate due to low job queue availability.")
-
-            self.downscale_rate()
-        elif availability_ratio >= JobScaler.AVAILABILITY_RATIO_THRESHOLD:
-            log.debug(
-                "Increasing job query rate due to increased job queue availability.")
-
+        elif current_concurrency < self.max_concurrency():
+            log.debug("Increasing job query rate due to worker under-utilization.")
             self.upscale_rate()
-
-        # Clear the job history
-        self.job_history.clear()
+        else:
+            # Keep in stasis
+            pass
