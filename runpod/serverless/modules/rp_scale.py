@@ -51,6 +51,7 @@ class JobScaler():
     MAX_CONCURRENT_REQUESTS = 1000
     MIN_CONCURRENT_REQUESTS = 1
     SLEEP_INTERVAL_SEC = 1
+    QUEUE_AVAILABILITY_THRESHOLD = 0.70
 
     def __init__(self, max_concurrency: typing.Any):
         self.background_get_job_tasks = set()
@@ -174,9 +175,9 @@ class JobScaler():
         current_concurrency = len(job_list.jobs)
 
         # If our worker is fully utilized, reduce the job query rate.
-        if availability_ratio < 0.50:
+        if availability_ratio < JobScaler.QUEUE_AVAILABILITY_THRESHOLD:
             log.debug(
-                "Reducing job query rate due to low job queue availability.")
+                "Reducing job query rate due to low queue availability.")
 
             self.downscale_rate()
         elif current_concurrency > self.max_concurrency():
