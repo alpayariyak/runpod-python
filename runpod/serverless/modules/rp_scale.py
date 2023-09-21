@@ -57,6 +57,7 @@ class JobScaler():
         self.num_concurrent_get_job_requests = JobScaler.MIN_CONCURRENT_REQUESTS
         self.max_concurrency = max_concurrency
         self._is_alive = True
+        self.job_history = []
 
     def is_alive(self):
         """
@@ -104,6 +105,7 @@ class JobScaler():
                 # Wait for all the 'get_job' tasks, which are running in parallel, to be completed.
                 for job_future in asyncio.as_completed(tasks):
                     job = await job_future
+                    self.job_history.append(1 if job else 0)
                     if job:
                         yield job
             else:
@@ -165,11 +167,19 @@ class JobScaler():
         """
         Scale up or down the rate at which we are handling jobs from SLS.
         """
+        # Compute the availability ratio of the job queue.
+        availability_ratio = sum(self.job_history) / len(self.job_history)
+
         # Compute the current level of concurrency inside of the worker
         current_concurrency = len(job_list.jobs)
 
         # If our worker is fully utilized, reduce the job query rate.
-        if current_concurrency > self.max_concurrency():
+        if availability_ratio < 0.50:
+            log.debug(
+                "Reducing job query rate due to low job queue availability.")
+
+            self.downscale_rate()
+        elif current_concurrency > self.max_concurrency():
             log.debug("Reducing job query rate due to full worker utilization.")
             self.downscale_rate()
         elif current_concurrency < self.max_concurrency():
@@ -178,3 +188,6 @@ class JobScaler():
         else:
             # Keep in stasis
             pass
+
+        # Clear the job history
+        self.job_history.clear()
