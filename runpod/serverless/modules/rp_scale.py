@@ -13,6 +13,7 @@ from .worker_state import Jobs
 log = RunPodLogger()
 job_list = Jobs()
 
+
 class JobScaler():
     """
     A class for automatically retrieving new jobs from the server and processing them concurrently.
@@ -174,13 +175,14 @@ class JobScaler():
         Scale up or down the rate at which we are handling jobs from SLS.
         """
         # Compute the availability ratio of the job queue.
-        availability_ratio = sum(self.job_history) / (len(self.job_history) + 1.0)
+        availability_ratio = sum(
+            self.job_history) / len(self.job_history) if self.job_history > 0 else None
 
         # Compute the current level of concurrency inside of the worker
         current_concurrency = len(job_list.jobs)
 
         # If our worker is fully utilized, reduce the job query rate.
-        if availability_ratio < JobScaler.QUEUE_AVAILABILITY_THRESHOLD:
+        if availability_ratio is not None and availability_ratio < JobScaler.QUEUE_AVAILABILITY_THRESHOLD:
             log.debug(
                 "Reducing job query rate due to low queue availability.")
 
@@ -189,7 +191,8 @@ class JobScaler():
             log.debug("Reducing job query rate due to full worker utilization.")
             self.downscale_rate()
         elif current_concurrency < self.max_concurrency():
-            log.debug("Increasing job query rate due to worker under-utilization.")
+            log.debug(
+                "Increasing job query rate due to worker under-utilization.")
             self.upscale_rate()
         else:
             # Keep in stasis
