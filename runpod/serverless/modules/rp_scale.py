@@ -176,7 +176,7 @@ class JobScaler():
         """
         # Compute the availability ratio of the job queue.
         availability_ratio = sum(
-            self.job_history) / len(self.job_history) if self.job_history > 0 else None
+            self.job_history) / len(self.job_history) if len(self.job_history) > 0 else None
 
         # Compute the current level of concurrency inside of the worker
         current_concurrency = len(job_list.jobs)
