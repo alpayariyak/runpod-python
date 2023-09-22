@@ -55,10 +55,15 @@ class JobScaler():
 
     def __init__(self, max_concurrency: typing.Any):
         self.background_get_job_tasks = set()
-        self.num_concurrent_get_job_requests = JobScaler.MIN_CONCURRENT_REQUESTS
         self.max_concurrency = max_concurrency
         self._is_alive = True
         self.job_history = []
+
+        # Let's initiate the number of concurrent job requests around the max concurrency.
+        if self.max_concurrency:
+            self.num_concurrent_get_job_requests = self.max_concurrency()
+        else:
+            self.num_concurrent_get_job_requests = JobScaler.MIN_CONCURRENT_REQUESTS
 
     def is_alive(self):
         """
