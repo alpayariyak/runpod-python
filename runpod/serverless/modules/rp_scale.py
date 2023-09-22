@@ -174,7 +174,7 @@ class JobScaler():
         Scale up or down the rate at which we are handling jobs from SLS.
         """
         # Compute the availability ratio of the job queue.
-        availability_ratio = sum(self.job_history) / len(self.job_history)
+        availability_ratio = sum(self.job_history) / (len(self.job_history) + 1.0)
 
         # Compute the current level of concurrency inside of the worker
         current_concurrency = len(job_list.jobs)
