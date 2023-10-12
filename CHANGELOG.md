@@ -5,6 +5,7 @@
 ### Changes
 
 - Backwards compatibility with Python >= 3.8
+- Confirmed 3.12 compatibility
 
 ### Fixed
 
