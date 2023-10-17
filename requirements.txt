@@ -12,4 +12,4 @@ tomli >= 2.0.1
 tqdm >= 4.66.1 ; python_version < "3.8"
 tqdm-loggable >= 0.1.4 ; python_version >= "3.8"
 urllib3 >= 1.26.6
-setuptools_scm >= 8.0.4
+setuptools_scm >= 8.0.4 ; python_version < "3.8"
