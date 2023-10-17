@@ -1,5 +1,13 @@
 # Change Log
 
+## Release 1.3.1 (10/17/23)
+
+### Changes
+
+- Backwards compatibility with Python >= 3.7
+
+---
+
 ## Release 1.3.0 (10/12/23)
 
 ### Changes
