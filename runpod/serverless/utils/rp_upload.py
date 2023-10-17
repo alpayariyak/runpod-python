@@ -18,7 +18,11 @@ from PIL import Image, UnidentifiedImageError
 from boto3 import session
 from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
-from tqdm_loggable.auto import tqdm
+
+try:
+    from tqdm_loggable.auto import tqdm
+except ImportError:
+    import tqdm
 
 
 logger = logging.getLogger("runpod upload utility")
