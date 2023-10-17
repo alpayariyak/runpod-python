@@ -1,10 +1,11 @@
 # Change Log
 
-## Release 1.3.1 (10/17/23)
+## Release 1.3.1 (TBD)
 
 ### Changes
 
 - Backwards compatibility with Python >= 3.7
+- Removed python-dotenv dependency
 
 ---
 
