@@ -69,10 +69,12 @@ class JobScaler():
                 break
 
             self.current_concurrency = self.concurrency_modifier(self.current_concurrency)
+            
+            jobs_running = len(job_list.get_job_list().split(","))
 
             tasks = [
                 asyncio.create_task(get_job(session, retry=False))
-                for _ in range(self.current_concurrency if job_list.get_job_list() else 1)
+                for _ in range(max(0, self.current_concurrency - jobs_running) if jobs_running else 1)
             ]
 
             for job_future in asyncio.as_completed(tasks):
